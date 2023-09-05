@@ -19,10 +19,20 @@ for(n in seq_along(e_anz_na_pos)){
 }
 
 # Generate suitable reference Data ----
-estCtrl$vartargetWindow = 600
+estCtrl$vartargetWindow = 400
 G1 <- garch(garchtype$general)
 G1_rw <- estimateGARCH_RollingWindow(e,G1,estCtrl)
 summary(G1_rw)
+# a=0.096, b=0.854
+
+# create TV object and estimate
+Tobs = NROW(e)
+st =  (1:Tobs)/Tobs
+TV <- tv(st,tvshape$delta0only)
+
+G1$pars <- G1_rw$Estimated$pars
+
+anz_refdata <- generateRefData(100,6023,TV,G1,corrObj = NULL, noiseDist = "Normal", seed=2)
 
 
 # Univariate tv estimations ----
