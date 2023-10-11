@@ -90,11 +90,9 @@ refData_ANZ <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL
 ptitle = "ANZ"
 saveRDS(refData_ANZ,paste0('RefData/',ptitle,'_RefData.RDS'))
 
-##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+##  End of Ref Data Generation ----
 
-##   RESTART HERE with an updated TV Model specification:   ####
 
-##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 e <- e_anz
 Tobs = NROW(e)
 plot(e,type='l',main=ptitle)
@@ -105,9 +103,13 @@ st = seq(0,1,length.out=Tobs)
 TV <- tv(st,tvshape$delta0only)
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
-
 simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
 
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+
+## RESTART HERE with an updated TV Model specification:   ####
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 RefTests = list()
 for (n in  1:maxTestOrd){
   RefTests[[n]] <- list()
@@ -151,8 +153,9 @@ saveFile = paste0("Results/TestResults_",simcontrol$saveAs)
 ## RELOAD Results
 #SIMRESULT = readRDS(saveFile)
 
+## RESULTS Section ----
 
-## P-Values from TEST Results, ANZ[1:3154]:
+## P-Values from TEST Results, TV-delta0 only, ANZ[1:3154]:
 
 # | Test Ord|   TR2| Robust|
 # |--------:|-----:|------:|
@@ -165,11 +168,131 @@ saveFile = paste0("Results/TestResults_",simcontrol$saveAs)
 ## We can try to identify & estimate a single transition, or split the data and retest:
 ## Let's try estimating a single order transition...
 
+e <- e_anz
+Tobs = NROW(e)
+#plot(e,type='l',main=ptitle)
+refData = refData_ANZ
+# create TV object and estimate
+st = seq(0,1,length.out=Tobs)
+TV <- tv(st,tvshape$single)
+TV <- estimateTV(e,TV,estCtrl)
+summary(TV)
+plot(TV)
+simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
 
-## Let's re-test with a subset of the data: ANZ[1:1500]
+## P-Values from TEST Results, TV-1_Trans, ANZ[1:3154]:
 
+# | Test Ord|   TR2| Robust|
+# |--------:|-----:|------:|
+# |        1| 0.019|  0.100|
+# |        2| 0.005|  0.020|
+# |        3| 0.000|  0.005|
 
+## Conclusion: 
+## Evidence of another transition exits
+## Let's try estimating a model with 2 x single order transitions...
 
+TV <- tv(st,c(tvshape$single,tvshape$single))
+TV <- estimateTV(e,TV,estCtrl)
+summary(TV)
+plot(TV)
+simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
+
+## P-Values from TEST Results, TV-2_Trans, ANZ[1:3154]:
+
+# | Test Ord|   TR2| Robust|
+# |--------:|-----:|------:|
+# |        1| 0.105|  0.683|
+# |        2| 0.029|  0.093|
+# |        3| 0.001|  0.000|
+
+## Conclusion: 
+## Still Evidence of another transition exits
+## Let's try estimating a model with 3 x single order transitions...
+
+TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single))
+TV <- estimateTV(e,TV,estCtrl)
+summary(TV)
+plot(TV)
+simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
+
+## Default starting values don't work well for this 3-Trans model, so...
+## Looking at the plot, the missing transition seems to be high-to-low around Obs 2500
+TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single))
+TV$pars["deltaN",] = c(-0.5,2,-1)
+TV$pars["speedN",] = c(4,6,6)
+TV$pars["locN1",] = c(0.4,0.6,0.8)
+
+TV <- estimateTV(e,TV,estCtrl)
+summary(TV)
+plot(TV)
+
+## P-Values from TEST Results, TV-3_Trans, ANZ[1:3154]:
+
+# | Test Ord| TR2| Robust|
+# |--------:|---:|------:|
+# |        1|   0|  0.144|
+# |        2|   0|  0.176|
+# |        3|   0|  0.001|
+#
+# Log-likelihood value(TV):  -5287.732
+
+## Conclusion: 
+## Still Evidence of another transition exits
+## Let's try estimating a model with 4 x single order transitions...
+
+TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
+TV <- estimateTV(e,TV,estCtrl)
+summary(TV)
+plot(TV)
+simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
+
+## Default starting values don't work well for this 4-Trans model, so...
+## Looking at the plot, the missing transition seems to be around Obs 1000 
+TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
+TV$pars["deltaN",] = c(1,-1,6,-5)
+TV$pars["speedN",] = c(2,2,5,4)
+TV$pars["locN1",] = c(0.35,0.4,0.7,0.75)
+TV$optimcontrol$reltol = 1e-9
+TV$optimcontrol$ndeps = rep(1e-6,13)
+
+TV <- estimateTV(e,TV,estCtrl)
+summary(TV)
+plot(TV)
+#
+## P-Values from TEST Results, TV-4_Trans, ANZ[1:3154]:
+
+# | Test Ord|   TR2| Robust|
+# |--------:|-----:|------:|
+# |        1| 0.437|  0.216|
+# |        2| 0.182|  0.023|
+# |        3| 0.194|  0.050|
+    
+## Conclusion: 
+## No Evidence of another transition exits!
+## OK, so maybe a very slight chance with Test Ord 3 being 5%, but...
+## it was difficult to find starting pars & optim controls to estimate this model
+## so we will stop here.
+
+## Final Model Specification:  ----
+
+# TV OBJECT
+# 
+# Transition Shapes: 1 1 1 1 
+# 
+# Estimation Results:
+#     
+#     Delta0 = 1.501141    se0 = 0.164958*** 
+#     
+#             st1      se1           st2      se2             st3      se3              st4      se4 
+# deltaN 1.945325 0.434912 *** -2.432078 0.395698   *** 18.181107 2.594712   *** -17.892599 2.585121   ***
+# speedN 4.788028 0.717099 ***  2.388774 0.362497   ***  6.999997 0.000000   ***   4.625933 0.104238   ***
+# locN1  0.313708 0.010694 ***  0.342392 0.031867   ***  0.712862 0.000429   ***   0.738316 0.002317   ***
+# locN2        NA      NaN            NA      NaN              NA      NaN               NA      NaN      
+# 
+# Log-likelihood value(TV):  -5130.843
+
+    
 
 
 
