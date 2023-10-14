@@ -39,7 +39,8 @@ if(FALSE){
 
 # Generate suitable reference Data (once only) ----
 # Visually find the longest stable-variance subset of data - to determine best Garch pars
-e <- e_anz[2500:3150]
+e <- e_anz
+e <- e_anz[2500:3153]
 Tobs = NROW(e)
 ptitle = "ANZ stable subest"
 plot(e,type='l',main=ptitle)
@@ -61,25 +62,6 @@ Garch1$pars <- Garch1$Estimated$pars  # The starting pars are used in the genera
 # alpha 0.061153 0.027582 ** 
 # beta  0.839795 0.083945 ***
 
-# Try the rolling window method:
-if(FALSE){
-    estCtrl$vartargetWindow = 300
-    Garch1 <- garch(garchtype$general)
-    Garch1_rollWin <- estimateGARCH_RollingWindow(e,Garch1,estCtrl)
-    summary(Garch1_rollWin)
-    Garch1_rollWin$Estimated$pars["alpha",1] + Garch1_rollWin$Estimated$pars["beta",1]
-    Garch1$pars <- Garch1_rollWin$Estimated$pars  # The starting pars are used in the generateRefData fn
-    # win=300, a=0.097559, b=0.847240, a+b=0.945
-    # win=400, a=0.082415, b=0.894717, a+b=0.977
-    # win=500, a=0.078079, b=0.905088, a+b=0.983
-    
-    # Method:  MLE, variance-targetting a rolling Window of 300 observations 
-    # Est      se1 sig
-    # omega 0.073229       NA    
-    # alpha 0.097559 0.023529 ***
-    # beta  0.847240 0.049561 ***
-}
-
 # Next, We need a standard TV object to generate the data:
 e <- e_anz
 Tobs = NROW(e)
@@ -90,8 +72,12 @@ refData_ANZ <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL
 ptitle = "ANZ"
 saveRDS(refData_ANZ,paste0('RefData/',ptitle,'_RefData.RDS'))
 
-##  End of Ref Data Generation ----
+# Reload refdata:
+refData = readRDS(paste0('RefData/',ptitle,'_RefData.RDS'))
 
+#  End of Ref Data Generation  #
+
+# START - Test for any transition ----
 
 e <- e_anz
 Tobs = NROW(e)
@@ -107,7 +93,7 @@ simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS"
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 
-## RESTART HERE with an updated TV Model specification:   ####
+# RESTART HERE with an updated TV Model specification:   ####
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 RefTests = list()
@@ -155,7 +141,7 @@ saveFile = paste0("Results/TestResults_",simcontrol$saveAs)
 
 ## RESULTS Section ----
 
-## P-Values from TEST Results, TV-delta0 only, ANZ[1:3154]:
+## P-Values from TEST Results, TV-delta0 only, ANZ[1:3153]:
 
 # | Test Ord|   TR2| Robust|
 # |--------:|-----:|------:|
@@ -180,7 +166,7 @@ summary(TV)
 plot(TV)
 simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
 
-## P-Values from TEST Results, TV-1_Trans, ANZ[1:3154]:
+## P-Values from TEST Results, TV-1_Trans, ANZ[1:3153]:
 
 # | Test Ord|   TR2| Robust|
 # |--------:|-----:|------:|
@@ -198,7 +184,7 @@ summary(TV)
 plot(TV)
 simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
 
-## P-Values from TEST Results, TV-2_Trans, ANZ[1:3154]:
+## P-Values from TEST Results, TV-2_Trans, ANZ[1:3153]:
 
 # | Test Ord|   TR2| Robust|
 # |--------:|-----:|------:|
@@ -227,7 +213,7 @@ TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
 plot(TV)
 
-## P-Values from TEST Results, TV-3_Trans, ANZ[1:3154]:
+## P-Values from TEST Results, TV-3_Trans, ANZ[1:3153]:
 
 # | Test Ord| TR2| Robust|
 # |--------:|---:|------:|
@@ -249,6 +235,9 @@ simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS"
 
 ## Default starting values don't work well for this 4-Trans model, so...
 ## Looking at the plot, the missing transition seems to be around Obs 1000 
+e <- e_anz
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
 TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
 TV$pars["deltaN",] = c(1,-1,6,-5)
 TV$pars["speedN",] = c(2,2,5,4)
@@ -260,7 +249,7 @@ TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
 plot(TV)
 #
-## P-Values from TEST Results, TV-4_Trans, ANZ[1:3154]:
+## P-Values from TEST Results, TV-4_Trans, ANZ[1:3153]:
 
 # | Test Ord|   TR2| Robust|
 # |--------:|-----:|------:|
@@ -292,7 +281,38 @@ plot(TV)
 # 
 # Log-likelihood value(TV):  -5130.843
 
-    
+
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+
+# START tvgarch Specification ----
+
+# We have 'g' ignoring Garch, now we need to find 'g' & 'h'
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+
+# Make sure 'e' is set to the full ANZ data set!
+# Run the estimation using default starting params & optim-controls
+# Use the results to fine tune above if needed.
+
+TVG <- tvgarch(TV,garchtype$gjr)
+
+TVG$tvpars["speedN",1] = 4
+TVG$tvOptimcontrol$reltol = 1e-05
+TVG$tvOptimcontrol$ndeps = rep(1e-05,length(TVG$tvOptimcontrol$ndeps))
+TVG$garchpars[,1] = c(0.1,0.02,0.7,0.05)
+TVG$garchOptimcontrol$reltol = 1e-04
+
+TVG <- estimateTVGARCH(e,TVG,estCtrl)
+summary(TVG)
+plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+#
+# Reload the saved TVG object:
+TVG <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+
+
+
 
 
 
