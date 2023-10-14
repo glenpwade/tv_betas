@@ -91,8 +91,9 @@ refData_CBA <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL
 ptitle = "CBA"
 saveRDS(refData_CBA,paste0('RefData/',ptitle,'_RefData.RDS'))
 
-##  End of Ref Data Generation ----
+#  End of Ref Data Generation 
 
+# START - Test for any transition ----
 
 e <- e_cba
 Tobs = NROW(e)
@@ -109,7 +110,7 @@ simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS"
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 
-## RESTART HERE with an updated TV Model specification:   ####
+# RESTART HERE with an updated TV Model specification:   ####
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 RefTests = list()
@@ -298,4 +299,40 @@ plot(TV)
 # locN2        NA      NaN            NA      NaN             NA      NaN              NA      NaN      
 # 
 # Log-likelihood value(TV):  -4891.686
+
+
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+
+# START tvgarch Specification ----
+
+# We have 'g' ignoring Garch, now we need to find 'g' & 'h'
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+
+# Make sure 'e' is set to the full CBA data set!
+# Run the estimation using default starting params & optim-controls
+# Use the results to fine tune above if needed.
+
+TVG <- tvgarch(TV,garchtype$gjr)
+
+TVG$tvpars[,1] = c(0.8,2.0,0.33,NA)
+TVG$tvOptimcontrol$reltol = 5e-04
+TVG$tvOptimcontrol$ndeps = rep(1e-04,length(TVG$tvOptimcontrol$ndeps))
+TVG$garchpars[,1] = c(0.05,0.02,0.7,0.05)
+TVG$garchOptimcontrol$reltol = 1e-04
+
+TVG <- estimateTVGARCH(e,TVG,estCtrl)
+summary(TVG)
+plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+#
+# Reload the saved TVG object:
+TVG <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+
+
+
+summary(TV)
+plot(TV)
+
 

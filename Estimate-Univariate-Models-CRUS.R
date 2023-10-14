@@ -53,8 +53,9 @@ ptitle = "CRUS"
 saveRDS(refData_CRUS,paste0('RefData/',ptitle,'_RefData.RDS'))
 
 #refData = readRDS(paste0('RefData/',ptitle,'_RefData.RDS'))
-##  End of Ref Data Generation ----
+#  End of Ref Data Generation 
 
+# START - Test for any transition ----
 
 e <- e_crus
 Tobs = NROW(e)
@@ -71,7 +72,7 @@ simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS"
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 
-## RESTART HERE with an updated TV Model specification:   ####
+# RESTART HERE with an updated TV Model specification:   ####
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 
@@ -174,3 +175,33 @@ plot(TV)
 # locN2         NA      NaN             NA      NaN      
 # 
 # Log-likelihood value(TV):  -5296.288
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+
+# START tvgarch Specification ----
+
+# We have 'g' ignoring Garch, now we need to find 'g' & 'h'
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+
+# Make sure 'e' is set to the full CR_AU data set!
+# Run the estimation using default starting params & optim-controls
+# Use the results to fine tune above if needed.
+
+TVG <- tvgarch(TV,garchtype$general)
+
+TVG <- estimateTVGARCH(e,TVG,estCtrl)
+summary(TVG)
+plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+#
+# Reload the saved TVG object:
+TVG1 <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+
+plot(TV,main=ptitle)
+summary(TVG1)
+
+identical(TVG,TVG1)
+
+
+
