@@ -230,6 +230,9 @@ TV$pars["locN1",] = c(0.15,0.7,0.75)
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
 plot(TV)
+plot(e_wbc,type='l')
+
+# Note: Migh need to revisit WBC univar TV estimate...
 
 ## P-Values from TEST Results, TV-3_Trans, WBC[1:3153]:
 
@@ -276,14 +279,25 @@ plot(TV)
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 
-TVG <- tvgarch(TV,garchtype$gjr)
+prices <- read.csv("data/tv_betas_prices.csv")
+e_wbc <- diff(log(as.numeric(prices$WBC)) ) * 100  # Percentage Returns
+e <- e_wbc
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+ptitle = "WBC"
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+#TV <- # Get model spec from "Final Model Specification" above
 
+TVG <- tvgarch(TV,garchtype$gjr)
+TVG$e_desc = "WBC Std.% Returns"
+
+TVG$tvpars[,1] = c(-0.5,3,0.01,NA)
 TVG$tvOptimcontrol$reltol = 1e-05
 TVG$garchOptimcontrol$reltol = 1e-04
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
 summary(TVG)
-plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 #
 # Reload the saved TVG object:
@@ -291,4 +305,5 @@ TVG1 <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 
 plot(TV,main=ptitle)
 
+summary(TVG1)
 

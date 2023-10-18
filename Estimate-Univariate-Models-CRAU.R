@@ -251,31 +251,35 @@ plot(TV)
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 
-TVG <- tvgarch(TV,garchtype$gjr)
+prices <- read.csv("data/tv_betas_prices.csv")
+e_crau <- tail(as.numeric(prices$CR_AU),-1)  # Percentage Returns - drop first (null) observation
+e <- e_crau
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+ptitle = "CRAU"
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+#TV <- # Get model spec from "Final Model Specification" above
 
-#TVG$tvpars[,4] = c(1,5,0.7,NA)
+TVG <- tvgarch(TV,garchtype$gjr)
+TVG$e_desc = "CRAU Std.% Returns"
+
 TVG$tvpars["speedN",] = c(2,5,5,5)
 TVG$tvpars["locN1",] = c(0.1,0.3,0.45,0.63)
 TVG$tvOptimcontrol$reltol = 5e-04
-#TVG$tvOptimcontrol$ndeps = rep(1e-06,length(TVG$tvOptimcontrol$ndeps))
 TVG$garchpars[,1] = c(0.1,0.01,0.8,0.02)
 TVG$garchOptimcontrol$reltol = 5e-05
 TVG$garchOptimcontrol$ndeps = c(1e-04,1e-09,1e-04,1e-04)
-#TVG$garchOptimcontrol$parscale = c(25,1,70,3)
 TVG$garchOptimcontrol$parscale = c(50,1,140,7)
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
 summary(TVG)
-plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 #
 # Reload the saved TVG object:
-TVG <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
-
-plot(TV,main=ptitle)
+TVG1 <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 summary(TVG1)
-
-identical(TVG,TVG1)
+plot(TVG1)
 
 
 

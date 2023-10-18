@@ -260,7 +260,7 @@ TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
 TV$pars["deltaN",] = c(1,-1,6,-5)
 TV$pars["speedN",] = c(2,2,5,4)
 TV$pars["locN1",] = c(0.35,0.4,0.7,0.75)
-TV$optimcontrol$reltol = 1e-9
+TV$optimcontrol$reltol = 1e-7
 TV$optimcontrol$ndeps = rep(1e-6,13)
 
 TV <- estimateTV(e,TV,estCtrl)
@@ -314,25 +314,36 @@ plot(TV)
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 
+prices <- read.csv("data/tv_betas_prices.csv")
+e_cba <- diff(log(as.numeric(prices$CBA)) ) * 100  # Percentage Returns
+e <- e_cba
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+ptitle = "CBA"
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+#TV <- # Get model spec from "Final Model Specification" above
+
 TVG <- tvgarch(TV,garchtype$gjr)
+TVG$e_desc = "CBA Std.% Returns"
 
 TVG$tvpars[,1] = c(0.8,2.0,0.33,NA)
 TVG$tvOptimcontrol$reltol = 5e-04
 TVG$tvOptimcontrol$ndeps = rep(1e-04,length(TVG$tvOptimcontrol$ndeps))
 TVG$garchpars[,1] = c(0.05,0.02,0.7,0.05)
 TVG$garchOptimcontrol$reltol = 1e-04
+#TVG$garchOptimcontrol$parscale = c(5,1,50,10)
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
 summary(TVG)
-plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+# Re-run the estimator until fully converged:
+TVG <- estimateTVGARCH(e,TVG,estCtrl)
+# Now Save!
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 #
 # Reload the saved TVG object:
-TVG <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+TVG1 <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 
-
-
-summary(TV)
-plot(TV)
-
+summary(TVG1)
+plot(TVG1)
 

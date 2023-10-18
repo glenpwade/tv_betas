@@ -294,25 +294,31 @@ plot(TV)
 # Make sure 'e' is set to the full ANZ data set!
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
-
+ptitle = "ANZ"
+prices <- read.csv("data/tv_betas_prices.csv")
+e_anz <- diff(log(as.numeric(prices$ANZ)) ) * 100  # Percentage Returns
+e <- e_anz
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+# TV = get final specification from code above
+#
 TVG <- tvgarch(TV,garchtype$gjr)
+TVG$e_desc = "ANZ Std.% Returns"
 
 TVG$tvpars["speedN",1] = 4
-TVG$tvOptimcontrol$reltol = 1e-05
+TVG$tvOptimcontrol$reltol = 1e-07
 TVG$tvOptimcontrol$ndeps = rep(1e-05,length(TVG$tvOptimcontrol$ndeps))
 TVG$garchpars[,1] = c(0.1,0.02,0.7,0.05)
 TVG$garchOptimcontrol$reltol = 1e-04
+TVG$garchOptimcontrol$reltol = 1e-05
+TVG$garchOptimcontrol$parscale = c(4,1,80,10)
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
 summary(TVG)
-plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 #
 # Reload the saved TVG object:
 TVG <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
-
-
-
-
 
 

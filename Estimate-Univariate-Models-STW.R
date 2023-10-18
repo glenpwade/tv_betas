@@ -281,8 +281,6 @@ plot(TV)
 # Log-likelihood value(TV):  -3972.32
 
 
-
-
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 
 # START tvgarch Specification ----
@@ -291,24 +289,34 @@ plot(TV)
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 
-# Make sure 'e' is set to the full NAB data set!
+# Make sure 'e' is set to the full STW data set!
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 
+prices <- read.csv("data/tv_betas_prices.csv")
+e_stw <- diff(log(as.numeric(prices$STW)) ) * 100  # Percentage Returns
+e <- e_stw
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+ptitle = "STW"
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+#TV <- # Get model spec from "Final Model Specification" above
+
 TVG <- tvgarch(TV,garchtype$gjr)
+TVG$e_desc = "STW Std.% Returns"
 
 TVG$tvpars[,1] = c(-1.5,5,0.05,NA)
 TVG$tvpars[,2] = c(-0.7,2.5,0.25,NA)
-TVG$tvOptimcontrol$reltol = 5e-05
-TVG$tvOptimcontrol$ndeps = rep(1e-04,length(TVG$tvOptimcontrol$ndeps))
-TVG$garchpars[,1] = c(0.02,0.002,0.8,0.15)
-TVG$garchOptimcontrol$reltol = 1e-03
-TVG$garchOptimcontrol$ndeps = c(1e-09,1e-03,1e-09,1e-09)
+TVG$tvOptimcontrol$reltol = 1e-04
+TVG$tvOptimcontrol$ndeps = rep(1e-06,length(TVG$tvOptimcontrol$ndeps))
+TVG$garchpars[,1] = c(0.02,0.002,0.85,0.1)
+TVG$garchOptimcontrol$reltol = 1e-04
+TVG$garchOptimcontrol$ndeps = c(1e-04,1e-07,1e-04,1e-04)
 TVG$garchOptimcontrol$parscale = c(50,1,300,65)
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
 summary(TVG)
-plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 #
 # Reload the saved TVG object:
@@ -317,7 +325,6 @@ TVG1 <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 plot(TV,main=ptitle)
 summary(TVG1)
 
-identical(TVG,TVG1)
 
 
 

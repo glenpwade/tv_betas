@@ -25,8 +25,32 @@ tvg_list[[9]] = readRDS("Results/CRUS_Final_TVG_model.RDS")
 tvg_names = c("ANZ","CBA","NAB","WBC","STW","SPY","PR","CRAU","CRUS")
 tvBetas <- ntvgarch(tvg_list,tvg_names)
 
+saveRDS(tvBetas,"Results/multivar-spec.RDS")
+
+tvBetas = readRDS("Results/multivar-spec.RDS")
 
 # Estimate the multivariate model ----
 
-??
-    
+# ??
+
+# Plot the returns, with g & h overlay ----
+
+ptitle = tvBetas$ANZ$e_desc
+e = tvBetas$ANZ@e
+plot(e,type='l',col="grey40",main=ptitle)
+abline(v=seq(1,3200,100),col="grey80")    
+lines(e,type='l',col="grey40")
+
+g = tvBetas$ANZ$Estimated$g
+lines(sqrt(g),type='l',col="red",lwd=2)
+
+h = tvBetas$ANZ$Estimated$h
+lines(sqrt(h),type='l',col="blue")
+
+gh = sqrt(g) + sqrt(h)
+lines(gh,type='l', col="green")
+
+summary(gh)
+var(e)
+
+plot(tvBetas$ANZ)

@@ -188,20 +188,32 @@ plot(TV)
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 
+
+prices <- read.csv("data/tv_betas_prices.csv")
+e_crus <- tail(as.numeric(prices$CR_US),-1)  # Percentage Returns - drop first (null) observation
+e <- e_crus
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+ptitle = "CRUS"
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+#TV <- # Get model spec from "Final Model Specification" above
+
 TVG <- tvgarch(TV,garchtype$general)
+TVG$e_desc = "CRUS Std.% Returns"
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
 summary(TVG)
-plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 #
 # Reload the saved TVG object:
-TVG1 <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+TVG <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 
 plot(TV,main=ptitle)
 summary(TVG1)
+plot(TVG1)
 
-identical(TVG,TVG1)
+
 
 
 

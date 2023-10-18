@@ -281,22 +281,33 @@ plot(TV)
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 
+prices <- read.csv("data/tv_betas_prices.csv")
+e_nab <- diff(log(as.numeric(prices$NAB)) ) * 100  # Percentage Returns
+e <- e_nab
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+ptitle = "NAB"
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+#TV <- # Get model spec from "Final Model Specification" above
+
 TVG <- tvgarch(TV,garchtype$gjr)
+TVG$e_desc = "NAB Std.% Returns"
 
 TVG$tvpars[,1] = c(0.1,4.5,0.4,NA)
 TVG$tvOptimcontrol$reltol = 1e-05
-TVG$tvOptimcontrol$ndeps = rep(1e-05,length(TVG$tvOptimcontrol$ndeps))
+TVG$tvOptimcontrol$ndeps = rep(1e-06,length(TVG$tvOptimcontrol$ndeps))
 TVG$garchpars[,1] = c(0.1,0.01,0.7,0.07)
 TVG$garchOptimcontrol$reltol = 1e-04
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
 summary(TVG)
-plot(TVG,main=ptitle)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
+plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 #
 # Reload the saved TVG object:
-TVG <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
+TVG1 <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 
 plot(TV,main=ptitle)
-
+summary(TVG1)
+plot(TVG1)
 
