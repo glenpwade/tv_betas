@@ -34,6 +34,7 @@ tvBetas = readRDS("Results/multivar-spec.RDS")
 
 # Estimate the multivariate model ----
 
+# "1/11/2019" -> Index 2165
 
 # TV Obj ----
 
@@ -112,18 +113,16 @@ for (n in 1:tvgBanks@N){
 }
 
 Tobs = NROW(e)
-st = seq(-0.5,0.5,length.out=Tobs)
+st = seq(0,1,length.out=Tobs)
 NullHyp = ccc(tvgBanks@N,tvgBanks)
+NullHyp$P = diag(nrow = tvgBanks@N)
 NullHyp = estimateCCC(e,NullHyp,estCtrl)
 testOrd = 1
 
 ccctest <- test.CCCParsim(e,NullHyp,st,testOrd)
 print(round(ccctest,5))
 
-z <- filterData(e,tvgBanks)
-H_1 <- stcc1(z,tvgBanks)
-
-stcctest = test.CCCvSTCC1(e,NullHyp,H_1,testOrd)
+stcctest = test.CCCvSTCC1(e,NullHyp,st,testOrd)
 print(round(stcctest,5))
 
 ## Banks Plus STW ----
@@ -154,9 +153,68 @@ testOrd = 1
 ccctest <- test.CCCParsim(e,NullHyp,st,testOrd)
 print(round(ccctest,5))
 
+stcctest = test.CCCvSTCC1(e,NullHyp,st,testOrd)
+print(round(stcctest,5))
 
 # Estimate the STCC model ----
 
+tvg_list = list()
+tvg_list[[1]] = readRDS("Results/ANZ_Final_TVG_model.RDS")
+tvg_list[[2]] = readRDS("Results/CBA_Final_TVG_model.RDS")
+tvg_list[[3]] = readRDS("Results/NAB_Final_TVG_model.RDS")
+tvg_list[[4]] = readRDS("Results/WBC_Final_TVG_model.RDS")
+
+## Banks Only ----
+
+tvg_names = c("ANZ","CBA","NAB","WBC")
+tvgBanks <- ntvgarch(tvg_list,tvg_names)
+
+e <- matrix()
+for (n in 1:tvgBanks@N){
+    if(n==1) e <- tvgBanks[[1]]@e
+    else e = cbind(e,tvgBanks[[n]]@e)
+}
+
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+z <- filterData(e,tvgBanks)
+NullHyp = stcc1(z,tvgBanks)
+NullHyp$P = diag(nrow = tvgBanks@N)
+NullHyp$pars[1] <- 5
+NullHyp$pars[2] <- 0.6
+# Switch P1 & P2
+NullHyp$P1 -> P1tmp
+NullHyp$P2 -> P2tmp
+NullHyp$P1 <- P2tmp
+NullHyp$P2 <- P1tmp
+
+NullHyp$optimcontrol$reltol = 1e-04
+NullHyp = estimateSTCC1(z,NullHyp,estCtrl)
+testOrd = 1
+
+stcctest1 = test.TVCC1vTVCC2(e,NullHyp,testOrd)
+
+# TODO: Tidy up ntvgarch object to avoid this shuffling!!
+for(n in seq_along(NullHyp$ntvgarch)){
+    NullHyp$ntvgarch[[n]]$Estimated = list()
+    NullHyp$ntvgarch[[n]]$Estimated$tv = list()
+    NullHyp$ntvgarch[[n]]$Estimated$tv$g <- NullHyp$ntvgarch[[n]]$tv$g
+    
+    NullHyp$ntvgarch[[n]]$Estimated$garch <- garch(garchtype$gjr)
+    NullHyp$ntvgarch[[n]]$Estimated$garch$h <- NullHyp$ntvgarch[[n]]$garch$h
+    
+    #NullHyp$ntvgarch[[n]]$tv <- tvg@tvObj
+    #NullHyp$ntvgarch[[n]]$tv$g <- tvg@tvObj@g
+    
+    #plot(NullHyp$ntvgarch[[n]]$tv)
+}
+
+stcctest2 = test.TVCC1vTVCC2(e,NullHyp,testOrd)
+print(round(stcctest,5))
+
+
+
+# Check Test Consistency ----
 
 tvg_list = list()
 
@@ -191,11 +249,49 @@ testOrd = 1
 ccctest <- test.CCCParsim(e,NullHyp,st,testOrd)
 print(round(ccctest,5))
 
-z <- filterData(e,tvgBanks)
-H_1 <- stcc1(z,tvgBanks)
-
-stcctest = test.CCCvSTCC1(e,NullHyp,H_1,testOrd)
+stcctest = test.CCCvSTCC1(e,NullHyp,st,testOrd)
 print(round(stcctest,5))
 
 all.equal(ccctest,stcctest)
+# Tests are consistent
+
+
+# Test for CEC: ----
+
+tvg_list = list()
+tvg_list[[1]] = readRDS("Results/ANZ_Final_TVG_model.RDS")
+tvg_list[[2]] = readRDS("Results/CBA_Final_TVG_model.RDS")
+tvg_list[[3]] = readRDS("Results/NAB_Final_TVG_model.RDS")
+tvg_list[[4]] = readRDS("Results/WBC_Final_TVG_model.RDS")
+
+## Banks Only ----
+
+#tvgBanks <- tvBetas[1:4]
+
+tvg_names = c("ANZ","CBA","NAB","WBC")
+tvgBanks <- ntvgarch(tvg_list,tvg_names)
+
+e <- matrix()
+for (n in 1:tvgBanks@N){
+    if(n==1) e <- tvgBanks[[1]]@e
+    else e = cbind(e,tvgBanks[[n]]@e)
+}
+
+Tobs = NROW(e)
+st = seq(0,1,length.out=Tobs)
+testOrd = 1
+#
+NullHyp = cec(tvgBanks@N,tvgBanks)
+NullHyp = estimateCEC(e,NullHyp,estCtrl)
+NullHyp$Estimated$P = diag(x=NullHyp$Estimated$pars,tvgBanks@N,tvgBanks@N)
+cectest <- test.CCCParsim(e,NullHyp,st,testOrd)
+print(round(cectest,5))
+#
+NullHyp = ccc(tvgBanks@N,tvgBanks)
+NullHyp = estimateCCC(e,NullHyp,estCtrl)
+ccctest <- test.CCCParsim(e,NullHyp,st,testOrd)
+print(round(ccctest,5))
+
+stcctest = test.CCCvSTCC1(e,NullHyp,st,testOrd)
+print(round(stcctest,5))
 

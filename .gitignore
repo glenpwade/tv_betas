@@ -47,3 +47,15 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Other user folders
+anna/
+RefData/
+SimDist/
+SimResults/
+
+
+
+
+
+

@@ -25,42 +25,43 @@ simcontrol$maxTestorder=maxTestOrd
 
 # Get Data  ----
 
-prices <- read.csv("data/tv_betas_prices.csv")
-e_anz <- diff(log(as.numeric(prices$ANZ)) ) * 100  # Percentage Returns
-#
-# Replace all NA's with the previous valid entry if required:
-if(FALSE){
-    e_anz_na_pos = which(is.na(e_anz) )
-    for(n in seq_along(e_anz_na_pos)){
-        t_pos <- e_anz_na_pos[n]
-        e_anz[t_pos] <- e_anz[t_pos-1]
-    }
-}
+# prices <- read.csv("data/tv_betas_prices.csv")
+# e_anz <- diff(log(as.numeric(prices$ANZ)) ) * 100  # Percentage Returns
+# #
+# # Replace all NA's with the previous valid entry if required:
+# if(FALSE){
+#     e_anz_na_pos = which(is.na(e_anz) )
+#     for(n in seq_along(e_anz_na_pos)){
+#         t_pos <- e_anz_na_pos[n]
+#         e_anz[t_pos] <- e_anz[t_pos-1]
+#     }
+# }
+
+allData <- readRDS("Data/Returns_USlagged_4B.RDS")
+e_anz <- allData$ANZ
 
 # Generate suitable reference Data (once only) ----
 # Visually find the longest stable-variance subset of data - to determine best Garch pars
 e <- e_anz
-e <- e_anz[2500:3153]
+plot(e,type='l')
+abline(v=c(1350,2200),col="red")
+abline(v=c(2400,3152),col="red")
+#e <- e_anz[1350:2200]
+e <- e_anz[2400:3152]
 Tobs = NROW(e)
-ptitle = "ANZ stable subest"
+ptitle = "ANZ stable subset"
 plot(e,type='l',main=ptitle)
 #
 Garch1 <- garch(garchtype$general)
-Garch1 = estimateGARCH(e,Garch1)
+Garch1 <- estimateGARCH(e,Garch1,estCtrl)
 summary(Garch1)
 Garch1$pars <- Garch1$Estimated$pars  # The starting pars are used in the generateRefData fn
 
-# e_anz[1400:1800]
-# Est se1 sig
-# omega 0.072941 NaN    
-# alpha 0.070489 NaN    
-# beta  0.852360 NaN 
-
-# e_anz[2500:3150]
+# e_anz[2400:3152]
 # Est      se1 sig
-# omega 0.132530 0.088212    
-# alpha 0.061153 0.027582 ** 
-# beta  0.839795 0.083945 ***
+# omega 0.032604 0.008911 ***
+# alpha 0.074835 0.009786 ***
+# beta  0.906791 0.012940 ***
 
 # Next, We need a standard TV object to generate the data:
 e <- e_anz
@@ -68,7 +69,7 @@ Tobs = NROW(e)
 st = seq(0,1,length.out=Tobs)
 TV <- tv(st,tvshape$delta0only)
 
-refData_ANZ <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL, noiseDist = noisedist, seed=1)
+refData_ANZ <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL, noiseDist = noisedist)
 ptitle = "ANZ"
 saveRDS(refData_ANZ,paste0('RefData/',ptitle,'_RefData.RDS'))
 
@@ -96,6 +97,7 @@ simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS"
 # RESTART HERE with an updated TV Model specification:   ####
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+
 RefTests = list()
 for (n in  1:maxTestOrd){
   RefTests[[n]] <- list()
@@ -141,13 +143,13 @@ saveFile = paste0("Results/TestResults_",simcontrol$saveAs)
 
 ## RESULTS Section ----
 
-## P-Values from TEST Results, TV-delta0 only, ANZ[1:3153]:
+## P-Values from TEST Results, TV-delta0 only, ANZ[1:3152]:
 
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.048|  0.008|
-# |        2| 0.078|  0.039|
-# |        3| 0.002|  0.018|
+##   | Test Ord|   TR2| Robust|
+#    |--------:|-----:|------:|
+#    |        1| 0.087|  0.028|
+#    |        2| 0.129|  0.089|
+#    |        3| 0.003|  0.034|
 
 ## Conclusion: 
 ## Evidence of a bump first and/or third order.
@@ -166,13 +168,13 @@ summary(TV)
 plot(TV)
 simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
 
-## P-Values from TEST Results, TV-1_Trans, ANZ[1:3153]:
+## P-Values from TEST Results, TV-1_Trans, ANZ[1:3152]:
 
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.019|  0.100|
-# |        2| 0.005|  0.020|
-# |        3| 0.000|  0.005|
+#   | Test Ord|   TR2| Robust|
+#   |--------:|-----:|------:|
+#   |        1| 0.026|  0.148|
+#   |        2| 0.005|  0.051|
+#   |        3| 0.000|  0.010|
 
 ## Conclusion: 
 ## Evidence of another transition exits
@@ -184,13 +186,13 @@ summary(TV)
 plot(TV)
 simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
 
-## P-Values from TEST Results, TV-2_Trans, ANZ[1:3153]:
+## P-Values from TEST Results, TV-2_Trans, ANZ[1:3152]:
 
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.105|  0.683|
-# |        2| 0.029|  0.093|
-# |        3| 0.001|  0.000|
+#    | Test Ord|   TR2| Robust|
+#    |--------:|-----:|------:|
+#    |        1| 0.242|  0.948|
+#    |        2| 0.069|  0.162|
+#    |        3| 0.004|  0.004|
 
 ## Conclusion: 
 ## Still Evidence of another transition exits
@@ -205,26 +207,27 @@ simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS"
 ## Default starting values don't work well for this 3-Trans model, so...
 ## Looking at the plot, the missing transition seems to be high-to-low around Obs 2500
 TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single))
-TV$pars["deltaN",] = c(-0.5,2,-1)
-TV$pars["speedN",] = c(4,6,6)
-TV$pars["locN1",] = c(0.4,0.6,0.8)
+TV$pars["deltaN",] = c(-0.5,6,-6)
+TV$pars["speedN",] = c(4,5,5)
+TV$pars["locN1",] = c(0.4,0.6,0.7)
+TV$optimcontrol$reltol = 1e-07
 
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
 plot(TV)
 
-## P-Values from TEST Results, TV-3_Trans, ANZ[1:3153]:
+## P-Values from TEST Results, TV-3_Trans, ANZ[1:3152]:
 
-# | Test Ord| TR2| Robust|
-# |--------:|---:|------:|
-# |        1|   0|  0.144|
-# |        2|   0|  0.176|
-# |        3|   0|  0.001|
+#    | Test Ord|   TR2| Robust|
+#    |--------:|-----:|------:|
+#    |        1| 0.093|  0.195|
+#    |        2| 0.101|  0.364|
+#    |        3| 0.077|  0.038|
 #
-# Log-likelihood value(TV):  -5287.732
+# Log-likelihood value(TV):  -5211.561
 
 ## Conclusion: 
-## Still Evidence of another transition exits
+## Some small Evidence of another transition exits
 ## Let's try estimating a model with 4 x single order transitions...
 
 TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
@@ -239,28 +242,23 @@ e <- e_anz
 Tobs = NROW(e)
 st = seq(0,1,length.out=Tobs)
 TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
-TV$pars["deltaN",] = c(1,-1,6,-5)
-TV$pars["speedN",] = c(2,2,5,4)
-TV$pars["locN1",] = c(0.35,0.4,0.7,0.75)
-TV$optimcontrol$reltol = 1e-9
-TV$optimcontrol$ndeps = rep(1e-6,13)
+TV$pars["deltaN",] = c(0.5,3,7,-9)
+TV$pars["speedN",] = c(5,3,5,4)
+TV$pars["locN1",] = c(0.35,0.6,0.7,0.75)
+TV$optimcontrol$reltol = 1e-7
+TV$optimcontrol$ndeps = rep(1e-9,13)
 
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
 plot(TV)
 #
-## P-Values from TEST Results, TV-4_Trans, ANZ[1:3153]:
+## P-Values from TEST Results, TV-4_Trans, ANZ[1:3152]:
 
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.437|  0.216|
-# |        2| 0.182|  0.023|
-# |        3| 0.194|  0.050|
+# Log-likelihood value(TV):  -5249.475
     
 ## Conclusion: 
-## No Evidence of another transition exits!
-## OK, so maybe a very slight chance with Test Ord 3 being 5%, but...
-## it was difficult to find starting pars & optim controls to estimate this model
+## The 4-Trans model is hard to estimate with SE.  The ll_value is worse than 3-Trans.
+## Considering the Test only barely indicated a 4th Transition, we will stop at 3.
 ## so we will stop here.
 
 ## Final Model Specification:  ----
@@ -269,17 +267,15 @@ plot(TV)
 # 
 # Transition Shapes: 1 1 1 1 
 # 
-# Estimation Results:
-#     
-#     Delta0 = 1.501141    se0 = 0.164958*** 
-#     
-#             st1      se1           st2      se2             st3      se3              st4      se4 
-# deltaN 1.945325 0.434912 *** -2.432078 0.395698   *** 18.181107 2.594712   *** -17.892599 2.585121   ***
-# speedN 4.788028 0.717099 ***  2.388774 0.362497   ***  6.999997 0.000000   ***   4.625933 0.104238   ***
-# locN1  0.313708 0.010694 ***  0.342392 0.031867   ***  0.712862 0.000429   ***   0.738316 0.002317   ***
-# locN2        NA      NaN            NA      NaN              NA      NaN               NA      NaN      
-# 
-# Log-likelihood value(TV):  -5130.843
+# Delta0 = 1.765208    se0 = 0.073322*** 
+#
+#               st1      se1 sig       st2      se2 sig.1       st3      se3 sig.2
+#  deltaN -0.577503 0.094753 *** 10.653926 1.053234   *** -9.906067 0.988327   ***
+#  speedN  5.973245 1.576291 ***  6.999987      NaN        4.392746 0.127020   ***
+#  locN1   0.420742 0.004207 ***  0.711766 0.000618   ***  0.742545 0.003914   ***
+#  locN2         NA      NaN            NA      NaN              NA      NaN      
+
+# Log-likelihood value(TV):  -5211.561
 
 
 
@@ -295,15 +291,13 @@ plot(TV)
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 ptitle = "ANZ"
-prices <- read.csv("data/tv_betas_prices.csv")
-e_anz <- diff(log(as.numeric(prices$ANZ)) ) * 100  # Percentage Returns
 e <- e_anz
 Tobs = NROW(e)
 st = seq(0,1,length.out=Tobs)
 # TV = get final specification from code above
 #
 TVG <- tvgarch(TV,garchtype$gjr)
-TVG$e_desc = "ANZ Std.% Returns"
+TVG$e_desc = "ANZ % Returns"
 
 TVG$tvpars["speedN",1] = 4
 TVG$tvOptimcontrol$reltol = 1e-07
@@ -321,4 +315,42 @@ saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 # Reload the saved TVG object:
 TVG <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 
+## Final Model Specification ####
 
+# -- TVGARCH Model Specification --
+#     
+#     Multiplicative Model Log-Likelihood Value:  -5032.714
+# 
+# TVGARCH Model Parameters:
+#     GARCH OBJECT
+# 
+# Type:  GJR Garch
+# Order: ( 1 , 1 )
+# Estimation Results:
+#     
+#     Method:  MLE 
+#                Est      se1 sig
+#     omega 0.015541 0.003691 ***
+#     alpha 0.014334 0.006879 ** 
+#     beta  0.930682 0.010235 ***
+#     gamma 0.075482 0.010818 ***
+#     
+#     Log-likelihood value(GARCH):  -5032.714
+# 
+# TV OBJECT
+# 
+# Transition Shapes: 1 1 1 
+# 
+# Estimation Results:
+#     
+#     Delta0 = 1.765208    se0 = NaN 
+# 
+#              st1      se1 sig      st2      se2 sig.1       st3      se3 sig.2
+# deltaN -1.144102 0.423570 *** 3.724952 1.743657   **  -2.375671 1.720534      
+# speedN  5.162228 0.740163 *** 4.179354 0.448528   ***  6.999983      NaN      
+# locN1   0.513852 0.008638 *** 0.599475 0.019978   ***  0.629153 0.001805   ***
+#     locN2         NA      NaN           NA      NaN              NA      NaN      
+# 
+# Log-likelihood value(TV):  -5032.96
+# 
+# -- End of TVGARCH Model Specification --
