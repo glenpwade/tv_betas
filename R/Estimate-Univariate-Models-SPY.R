@@ -24,22 +24,51 @@ simcontrol$maxTestorder=maxTestOrd
 ## mtvgarch pkg needs an update to make this optional & std Normal by default
 
 # Get Data  ----
-
-prices <- read.csv("data/tv_betas_prices.csv")
-e_spy <- tail(as.numeric(prices$r_SPY),-1)  # Percentage Returns - drop first (null) observation
+ptitle = "SPY"
+allData <- readRDS("Data/Returns_USlagged_4B.RDS")
+e_spy <- allData$SPY
 
 # Generate suitable reference Data (once only) ----
 # Visually find the longest stable-variance subset of data - to determine best Garch pars
-e <- e_spy[160:1099]
+e <- e_spy
+e <- e_spy[180:1099]
 Tobs = NROW(e)
 ptitle = "SPY stable subest"
 plot(e,type='l',main=ptitle)
-abline(v=seq(0,3200,by=100),col="grey")
+abline(v=seq(0,3200,by=200),col="grey")
 #
 Garch1 <- garch(garchtype$general)
 Garch1 = estimateGARCH(e,Garch1)
 summary(Garch1)
 Garch1$pars <- Garch1$Estimated$pars  # The starting pars are used in the generateRefData fn
+
+# Method:  MLE 
+# Est      se1 sig
+# omega 0.078414 0.023503 ***
+# alpha 0.117832 0.030850 ***
+# beta  0.743659 0.057963 ***
+#     
+#     Log-likelihood value(GARCH):  -1011.895
+
+# Try the rolling window method:
+if(FALSE){
+    e <- e_spy[200:2200]
+    Tobs = NROW(e)
+    estCtrl$vartargetWindow = 500
+    Garch1 <- garch(garchtype$general)
+    Garch1_rollWin <- estimateGARCH_RollingWindow(e,Garch1,estCtrl)
+    summary(Garch1_rollWin)
+    Garch1_rollWin$Estimated$pars["alpha",1] + Garch1_rollWin$Estimated$pars["beta",1]
+    Garch1$pars <- Garch1_rollWin$Estimated$pars  # The starting pars are used in the generateRefData fn
+    
+    # Method:  MLE, variance-targetting a rolling Window of 500 observations 
+    #            Est      se1 sig
+    # omega 0.089715       NA    
+    # alpha 0.173298 0.021142 ***
+    # beta  0.726568 0.035248 ***
+    #     
+    #     Log-likelihood value(GARCH):  -2215.578
+}
 
 # Next, We need a standard TV object to generate the data:
 e <- e_spy
@@ -47,7 +76,7 @@ Tobs = NROW(e)
 st = seq(0,1,length.out=Tobs)
 TV <- tv(st,tvshape$delta0only)
 
-refData_SPY <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL, noiseDist = noisedist, seed=1)
+refData_SPY <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL, noiseDist = noisedist)
 ptitle = "SPY"
 saveRDS(refData_SPY,paste0('RefData/',ptitle,'_RefData.RDS'))
 
@@ -59,7 +88,7 @@ saveRDS(refData_SPY,paste0('RefData/',ptitle,'_RefData.RDS'))
 e <- e_spy
 Tobs = NROW(e)
 plot(e,type='l',main=ptitle)
-abline(v=seq(0,3200,by=100),col="grey")
+abline(v=seq(0,3200,by=200),col="grey")
 refData = refData_SPY
 
 # create TV object and estimate
@@ -87,6 +116,7 @@ for (n in  1:maxTestOrd){
 # 1. For each column of refData, estimate the null TV model, then calculate test statistics (TR2 & Robust) for each requested TestOrder
 # 2. Then compare actual RefTest statistics with the TestStat-distributions (i.e. get p-values)
 # 3. This takes approx. 3 minutes for the TV$delta0 specification running in local-cpu parallel mode on an i7 3GHz 4-core/8-processor CPU,  Win10PC
+
 SIMRESULT = testStatDist(refData,TV,RefTests,simcontrol)
 
 # Print the test Results:
@@ -107,58 +137,26 @@ saveRDS(SIMRESULT,saveFile)
 
 ## RESULTS Section ----
 
-## P-Values from TEST Results, TV-delta0 only, SPY[1:3153]:
+## P-Values from TEST Results, TV-delta0 only, SPY[1:3152]:
 
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.062|  0.032|
-# |        2| 0.085|  0.000|
-# |        3| 0.002|  0.000|
-
-## Conclusion: 
-## Strong Evidence of a bump
-## Let's try estimating a single order transition...
-
-e <- e_spy
-Tobs = NROW(e)
-plot(e,type='l',main=ptitle)
-abline(v=seq(0,3200,by=100),col="grey")
-refData = refData_SPY
-# create TV object and estimate
-st = seq(0,1,length.out=Tobs)
-TV <- tv(st,tvshape$single)
-TV <- estimateTV(e,TV,estCtrl)
-summary(TV)
-plot(TV)
-simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
-
-## P-Values from TEST Results, TV-1_Trans, SPY[1:3153]:
-
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.009|  0.037|
-# |        2| 0.008|  0.137|
-# |        3| 0.002|  0.015|
+#     | Test Ord|   TR2| Robust|
+#     |--------:|-----:|------:|
+#     |        1| 0.150|  0.106|
+#     |        2| 0.218|  0.001|
+#     |        3| 0.020|  0.000|
 
 ## Conclusion: 
-## Evidence of another transition exits 
-## Let's try estimating a model with 2 x single order transitions...
-
-e <- e_spy
-Tobs = NROW(e)
-# create TV object and estimate
-st = seq(0,1,length.out=Tobs)
-TV <- tv(st,c(tvshape$single,tvshape$single))
-TV$optimcontrol$reltol = 1e-03
-TV$optimcontrol$ndeps = rep(1e-03,length(TV$optimcontrol$ndeps))
-TV <- estimateTV(e,TV,estCtrl)
-summary(TV)
-plot(TV)
-
-# A TV-2_Trans model cannot be fitted well.
-# let's try a TV-3_Trans (Since strongest test evidence points to a 3rd order)
+## Strong Evidence of a bump, most likely 3
+## Let's try estimating a 3 transition model...
 
 TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single))
+## Default starting values don't work perfectly for this 3-Trans model, so...
+TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
+TV$optimcontrol$reltol = 1e-03
+TV$optimcontrol$ndeps = rep(1e-06,length(TV$optimcontrol$ndeps))
+TV$pars["deltaN",] = c(-1,1,5,-4)
+TV$pars["speedN",] = c(4,4,6,5)
+TV$pars["locN1",] = c(0.15,0.4,0.7,0.75)
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
 plot(TV)
@@ -175,28 +173,7 @@ plot(TV)
 
 ## Conclusion: 
 ## Still Evidence of another transition exits
-## Let's try estimating a model with 2 x single order transitions...
-
-e <- e_spy
-Tobs = NROW(e)
-# create TV object and estimate
-st = seq(0,1,length.out=Tobs)
-TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
-TV <- estimateTV(e,TV,estCtrl)
-summary(TV)
-plot(TV)
-
-## Default starting values don't work perfectly for this 4-Trans model, so...
-TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
-TV$optimcontrol$reltol = 1e-03
-TV$optimcontrol$ndeps = rep(1e-06,length(TV$optimcontrol$ndeps))
-TV$pars["deltaN",] = c(-1,1,5,-4)
-TV$pars["speedN",] = c(4,4,6,5)
-TV$pars["locN1",] = c(0.15,0.4,0.7,0.75)
-## Can't seem to fit a 3-transition model...
-TV <- estimateTV(e,TV,estCtrl)
-summary(TV)
-plot(TV)
+## Let's try estimating a model based on the plot
 
 # By observing the plot, we can try the following shape:
 e <- e_spy
@@ -210,16 +187,19 @@ TV$pars["locN1",] = c(0.5,0.7,0.75,0.9)
 #
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
+plot(e,type='l')
+lines(TV@g,col="red")
+lines(sqrt(TV@g),col="red")
 plot(TV)
-abline(v=seq(0,3200,by=100),col="grey80")
+abline(v=seq(0,3200,by=200),col="grey80")
 
-## P-Values from TEST Results, TV-4_Trans, SPY[1:3153]:
+## P-Values from TEST Results, TV-4_Trans, SPY[1:3152]:
 
 # | Test Ord|   TR2| Robust|
 # |--------:|-----:|------:|
-# |        1| 0.710|  0.320|
-# |        2| 0.627|  0.459|
-# |        3| 0.327|  0.188|
+# |        1| 0.760|  0.404|
+# |        2| 0.705|  0.564|
+# |        3| 0.382|  0.249|
 
 ## Conclusion: 
 ## No Evidence of another transition!
@@ -227,21 +207,19 @@ abline(v=seq(0,3200,by=100),col="grey80")
 
 ## Final Model Specification:  ----
 
-# TV OBJECT
-# 
 # Transition Shapes: 3 1 1 3 
 # 
 # Estimation Results:
 #     
-# Delta0 = 4.311583    se0 = 0.724877*** 
+#     Delta0 = 4.110256    se0 = 0.678409*** 
 #     
-#            st1      se1 sig       st2      se2 sig.1        st3      se3 sig.2       st4      se4 sig.3
-# deltaN 1.55987 0.077772 *** 12.128165 2.455598   *** -12.488008 2.402175   *** -4.926207 0.723412   ***
-# speedN 5.81061 0.137957 ***  6.316793 0.185997   ***   4.618113 0.209851   ***  6.935429 0.170850   ***
-# locN1  0.48237 0.003227 ***  0.709922 0.000774   ***   0.726778 0.003843   ***  0.904372 0.002577   ***
-# locN2       NA      NaN            NA      NaN               NA      NaN              NA      NaN      
+#     st1      se1 sig       st2      se2 sig.1        st3      se3 sig.2       st4      se4 sig.3
+#     deltaN 1.569631 0.078639 *** 13.278953 4.219621   *** -13.634410 4.135510   *** -4.730295 0.677332   ***
+#     speedN 5.819993 0.139181 ***  6.263004 0.224640   ***   4.649898 0.296112   ***  6.954825 0.185826   ***
+#     locN1  0.482457 0.003236 ***  0.710209 0.000933   ***   0.726438 0.005047   ***  0.904094 0.002608   ***
+#     locN2        NA      NaN            NA      NaN               NA      NaN              NA      NaN      
 # 
-# Log-likelihood value(TV):  -4259.378
+# Log-likelihood value(TV):  -4258.319
 
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
@@ -256,8 +234,6 @@ abline(v=seq(0,3200,by=100),col="grey80")
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 
-prices <- read.csv("data/tv_betas_prices.csv")
-e_spy <- tail(as.numeric(prices$r_SPY),-1)  # Percentage Returns - drop first (null) observation
 e <- e_spy
 Tobs = NROW(e)
 st = seq(0,1,length.out=Tobs)
@@ -266,15 +242,16 @@ estCtrl = list(verbose=TRUE,calcSE=TRUE)
 #TV <- # Get model spec from "Final Model Specification" above
 
 TVG <- tvgarch(TV,garchtype$gjr)
-TVG$e_desc = "SPY Std.% Returns"
+TVG$e_desc = "SPY % Returns"
 
 #TVG$garchpars[,1] = c(0.02,0.002,0.8,0.15)
 #TVG$garchOptimcontrol$reltol = 1e-03
-TVG$garchOptimcontrol$ndeps = c(1e-09,1e-03,1e-09,1e-09)
-TVG$garchOptimcontrol$parscale = c(20,1,500,100)
+TVG$garchOptimcontrol$ndeps = c(1e-07,1e-03,1e-07,1e-07)
+TVG$garchOptimcontrol$parscale = c(10,1,50,10)
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
-summary(TVG)
+summary(TVG@garchObj)
+summary(TVG@tvObj)
 plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 #

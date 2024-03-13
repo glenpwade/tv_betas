@@ -24,43 +24,54 @@ simcontrol$maxTestorder=maxTestOrd
 ## mtvgarch pkg needs an update to make this optional & std Normal by default
 
 # Get Data  ----
-
-prices <- read.csv("data/tv_betas_prices.csv")
-e_wbc <- diff(log(as.numeric(prices$WBC)) ) * 100  # Percentage Returns
+ptitle = "WBC"
+allData <- readRDS("Data/Returns_USlagged_4B.RDS")
+e_wbc <- allData$WBC
 #
-# Replace all NA's with the previous valid entry if required:
-if(FALSE){
-    na_pos = which(is.na(e_wbc) )
-    for(n in seq_along(na_pos)){
-        t_pos <- na_pos[n]
-        e_wbc[t_pos] <- e_wbc[t_pos-1]
-    }
-}
 
 # Generate suitable reference Data (once only) ----
 # Visually find the longest stable-variance subset of data - to determine best Garch pars
+e <- e_wbc
 e <- e_wbc[1320:2225]
 Tobs = NROW(e)
 ptitle = "WBC stable subest"
 plot(e,type='l',main=ptitle)
-abline(v=seq(0,3200,by=100),col="grey")
+abline(v=seq(0,3200,by=200),col="grey")
 #
 Garch1 <- garch(garchtype$general)
 Garch1 = estimateGARCH(e,Garch1)
 summary(Garch1)
 Garch1$pars <- Garch1$Estimated$pars  # The starting pars are used in the generateRefData fn
 
-# e_wbc[1400:1800]
-# Est se1 sig
-# omega 0.072941 NaN    
-# alpha 0.070489 NaN    
-# beta  0.852360 NaN 
-
-# e_wbc[2500:3150]
+# e_wbc
+# Method:  MLE 
 # Est      se1 sig
-# omega 0.132530 0.088212    
-# alpha 0.061153 0.027582 ** 
-# beta  0.839795 0.083945 ***
+# omega 0.103720 0.021855 ***
+#     alpha 0.140434 0.020762 ***
+#     beta  0.806624 0.027887 ***
+#     
+#     Log-likelihood value(GARCH):  -5150.218
+
+
+# No suitable stable subset, so...
+# Try the rolling window method:
+if(FALSE){
+    e <- e_wbc
+    estCtrl$vartargetWindow = 500
+    Garch1 <- garch(garchtype$general)
+    Garch1_rollWin <- estimateGARCH_RollingWindow(e,Garch1,estCtrl)
+    summary(Garch1_rollWin)
+    Garch1_rollWin$Estimated$pars["alpha",1] + Garch1_rollWin$Estimated$pars["beta",1]
+    Garch1$pars <- Garch1_rollWin$Estimated$pars  # The starting pars are used in the generateRefData fn
+    
+    #     Method:  MLE, variance-targetting a rolling Window of 500 observations 
+    # Est      se1 sig
+    # omega 0.100310       NA    
+    # alpha 0.151057 0.019162 ***
+    # beta  0.787219 0.030467 ***
+    #     
+    #     Log-likelihood value(GARCH):  -5171.531
+}
 
 
 # Next, We need a standard TV object to generate the data:
@@ -69,7 +80,7 @@ Tobs = NROW(e)
 st = seq(0,1,length.out=Tobs)
 TV <- tv(st,tvshape$delta0only)
 
-refData_WBC <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL, noiseDist = noisedist, seed=1)
+refData_WBC <- generateRefData(simcontrol$numLoops,Tobs,TV,Garch1,corrObj = NULL, noiseDist = noisedist)
 ptitle = "WBC"
 saveRDS(refData_WBC,paste0('RefData/',ptitle,'_RefData.RDS'))
 
@@ -80,7 +91,7 @@ saveRDS(refData_WBC,paste0('RefData/',ptitle,'_RefData.RDS'))
 e <- e_wbc
 Tobs = NROW(e)
 plot(e,type='l',main=ptitle)
-abline(v=seq(0,3200,by=100),col="grey")
+abline(v=seq(0,3200,by=200),col="grey")
 refData = refData_WBC
 
 # create TV object and estimate
@@ -108,6 +119,7 @@ for (n in  1:maxTestOrd){
 # 1. For each column of refData, estimate the null TV model, then calculate test statistics (TR2 & Robust) for each requested TestOrder
 # 2. Then compare actual RefTest statistics with the TestStat-distributions (i.e. get p-values)
 # 3. This takes approx. 3 minutes for the TV$delta0 specification running in local-cpu parallel mode on an i7 3GHz 4-core/8-processor CPU,  Win10PC
+
 SIMRESULT = testStatDist(refData,TV,RefTests,simcontrol)
 
 # Print the test Results:
@@ -141,64 +153,17 @@ saveRDS(SIMRESULT,saveFile)
 
 ## RESULTS Section ----
 
-## P-Values from TEST Results, TV-delta0 only, WBC[1:3153]:
+## P-Values from TEST Results, TV-delta0 only, WBC[1:3152]:
 
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.085|  0.035|
-# |        2| 0.211|  0.114|
-# |        3| 0.000|  0.003|
-
-## Conclusion: 
-## Evidence of a bump - first or third order.
-## We can try to identify & estimate a single transition, or split the data and retest:
-## Let's try estimating a single order transition...
-
-e <- e_wbc
-Tobs = NROW(e)
-#plot(e,type='l',main=ptitle)
-abline(v=seq(0,3200,by=100),col="grey")
-refData = refData_WBC
-# create TV object and estimate
-st = seq(0,1,length.out=Tobs)
-TV <- tv(st,tvshape$single)
-TV <- estimateTV(e,TV,estCtrl)
-summary(TV)
-plot(TV)
-simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
-
-## P-Values from TEST Results, TV-1_Trans, WBC[1:3153]:
-
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.004|  0.014|
-# |        2| 0.003|  0.012|
-# |        3| 0.001|  0.001|
+#     | Test Ord|   TR2| Robust|
+#     |--------:|-----:|------:|
+#     |        1| 0.373|  0.284|
+#     |        2| 0.653|  0.572|
+#     |        3| 0.123|  0.206|
 
 ## Conclusion: 
-## Evidence of another transition exits
-## Let's try estimating a model with 2 x single order transitions...
-
-TV <- tv(st,c(tvshape$single,tvshape$single))
-TV$optimcontrol$reltol = 1e-7
-TV <- estimateTV(e,TV,estCtrl)
-summary(TV)
-plot(TV)
-simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS")
-
-## P-Values from TEST Results, TV-2_Trans, WBC[1:3153]:
-
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.144|  0.062|
-# |        2| 0.008|  0.013|
-# |        3| 0.002|  0.005|
-
-
-## Conclusion: 
-## Still Evidence of another transition exits
+## No Evidence of a bump - but many visible in the plot
 ## Let's try estimating a model with 3 x single order transitions...
-
 TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single))
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
@@ -208,64 +173,80 @@ simcontrol$saveAs = paste0("Simdist_",ptitle,"_TV",TV@nr.transitions,"Trans.RDS"
 ## Default starting values don't work well for this 3-Trans model, so...
 ## Looking at the plot, the missing transition seems to be high-to-low around Obs 2500
 TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single))
-TV$optimcontrol$reltol = 1e-04
-TV$optimcontrol$ndeps = rep(1e-06,10)
-TV$pars["deltaN",] = c(-1,8,-7)
+TV$optimcontrol$reltol = 1e-05
+TV$optimcontrol$ndeps = rep(1e-05,10)
+#TV$optimcontrol$parscale = c(5,3,1,1,30,10,1,30,10,1)
+TV$pars["deltaN",] = c(-1,18,-17)
 TV$pars["speedN",] = c(2,6,5)
-TV$pars["locN1",] = c(0.45,0.7,0.75)
+TV$pars["locN1",] = c(0.25,0.7,0.75)
 ## The above estimates the model well, but Tests won't run...
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
+plot(e,type='l')
+lines(TV@g,col="red")
 plot(TV)
 
-# So - let's tweak the Optim controls:
-TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single))
+## Log-likelihood value(TV):  -5281.867
+
+
+## 4-TRANS ####
+
+## Let's try estimating a model with 3 x single order transitions...
+## Default starting values don't work well for this 4-Trans model, so...
+## Looking at the plot, the missing transition seems to be high-to-low around Obs 2500
+TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single))
 TV$optimcontrol$reltol = 1e-04
-TV$optimcontrol$ndeps = rep(1e-06,10)
-TV$optimcontrol$parscale = c(1,3,3,1,15,7,1,15,5,1)
-TV$pars["deltaN",] = c(-1,8,-7)
-TV$pars["speedN",] = c(2,6,5)
-TV$pars["locN1",] = c(0.15,0.7,0.75)
-#
+TV$optimcontrol$ndeps = rep(1e-07,length(TV$optimcontrol$ndeps))
+TV$optimcontrol$parscale = c(5,3,1,1,30,10,1,5,3,1,30,10,1)
+TV$pars["deltaN",] = c(1,-1,18,-17)
+TV$pars["speedN",] = c(3,3,6,5)
+TV$pars["locN1",] = c(0.1,0.25,0.7,0.75)
+## The above estimates the model well, but Tests won't run...
 TV <- estimateTV(e,TV,estCtrl)
 summary(TV)
+plot(e,type='l')
+lines(TV@g,col="red")
 plot(TV)
-plot(e_wbc,type='l')
 
-# Note: Migh need to revisit WBC univar TV estimate...
+# Log-likelihood value(TV):  -5265.986
 
-## P-Values from TEST Results, TV-3_Trans, WBC[1:3153]:
+## 5-TRANS ####
 
-# | Test Ord|   TR2| Robust|
-# |--------:|-----:|------:|
-# |        1| 0.078|  0.057|
-# |        2| 0.086|  0.116|
-# |        3| 0.097|  0.206|
+## Let's try estimating a model with 5 x single order transitions...
+## Default starting values don't work well for this 5-Trans model, so...
+TV <- tv(st,c(tvshape$single,tvshape$single,tvshape$single,tvshape$single,tvshape$single))
+TV$optimcontrol$reltol = 1e-05
+TV$optimcontrol$ndeps = rep(1e-07,length(TV$optimcontrol$ndeps))
+TV$optimcontrol$parscale = c(5,3,1,1,5,3,1,5,3,1,30,10,1,30,10,1)
+TV$pars["deltaN",] = c(-1,2,-2,16,-15)
+TV$pars["speedN",] = c(3,4,4,6,5)
+TV$pars["locN1",] = c(0.2,0.3,0.4,0.7,0.75)
+## The above estimates the model well, but Tests won't run...
+TV <- estimateTV(e,TV,estCtrl)
+summary(TV)
+plot(e,type='l')
+lines(TV@g,col="red")
+plot(TV)
 
-#
-
-## Conclusion: 
-## No Evidence of another transition!
+saveRDS(TV,paste0('Results/',ptitle,'_Final_TV_model.RDS'))
 
 
 ## Final Model Specification:  ----
 # 
 # TV OBJECT
 # 
-# Transition Shapes: 1 1 1 
+# Transition Shapes: 1 1 1 1 1 
 # 
 # Estimation Results:
 #     
-# Delta0 = 1.540203    se0 = 0.047555*** 
+#     Delta0 = 2.579733    se0 = 0.293072*** 
 #     
-#             st1      se1 sig      st2      se2 sig.1       st3      se3 sig.2
-# deltaN 4.725349 0.636648 *** 5.019944 1.925816   *** -9.778395 2.245770   ***
-# speedN 4.293456 0.403468 *** 4.927609 0.591673   ***  4.913416 0.245546   ***
-# locN1  0.706207 0.008651 *** 0.706462 0.004997   ***  0.749147 0.006449   ***
-# locN2        NA      NaN           NA      NaN              NA      NaN      
+#     st1      se1 sig      st2      se2 sig.1       st3      se3 sig.2       st4      se4 sig.3        st5      se5 sig.4
+#       deltaN -2.927694 0.466200 *** 3.501768 0.619137   *** -2.007502 0.568469   *** 17.305049 2.140172   *** -16.947159 2.077289   ***
+#       speedN  2.743619 0.296067 *** 3.723701 0.264668   ***  6.999675 0.402992   ***  6.998945 0.628456   ***   4.629745 0.115255   ***
+#       locN1   0.188679 0.014303 *** 0.320066 0.016233   ***  0.418380 0.002156   ***  0.712607 0.000532   ***   0.735961 0.002909   ***
 # 
-# Log-likelihood value(TV):  -5331.788
-
+# Log-likelihood value(TV):  -5177.808
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 
@@ -275,12 +256,10 @@ plot(e_wbc,type='l')
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 
-# Make sure 'e' is set to the full NAB data set!
+# Make sure 'e' is set to the full WBC data set!
 # Run the estimation using default starting params & optim-controls
 # Use the results to fine tune above if needed.
 
-prices <- read.csv("data/tv_betas_prices.csv")
-e_wbc <- diff(log(as.numeric(prices$WBC)) ) * 100  # Percentage Returns
 e <- e_wbc
 Tobs = NROW(e)
 st = seq(0,1,length.out=Tobs)
@@ -289,21 +268,25 @@ estCtrl = list(verbose=TRUE,calcSE=TRUE)
 #TV <- # Get model spec from "Final Model Specification" above
 
 TVG <- tvgarch(TV,garchtype$gjr)
-TVG$e_desc = "WBC Std.% Returns"
+TVG$e_desc = "WBC % Returns"
 
-TVG$tvpars[,1] = c(-0.5,3,0.01,NA)
 TVG$tvOptimcontrol$reltol = 1e-05
 TVG$garchOptimcontrol$reltol = 1e-04
 
 TVG <- estimateTVGARCH(e,TVG,estCtrl)
-summary(TVG)
+summary(TVG@garchObj)
+summary(TVG@tvObj)
 plot(TVG)   # Note: produces 2 plots: sqrt(g)  &  sqrt(h)  
 saveRDS(TVG,paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
-#
+plot(e,type='l')
+lines(sqrt(TVG$Estimated$g),col="red")
+
 # Reload the saved TVG object:
 TVG1 <- readRDS(paste0('Results/',ptitle,'_Final_TVG_model.RDS'))
 
 plot(TV,main=ptitle)
-
 summary(TVG1)
+
+
+
 
