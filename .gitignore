@@ -9,6 +9,9 @@
 # User-specific files
 .Ruserdata
 
+# User Data files
+*.RDS
+
 # Example code in package build process
 *-Ex.R
 
@@ -49,10 +52,9 @@ po/*~
 rsconnect/
 
 # Other user folders
-anna/
-RefData/
-SimDist/
-SimResults/
+R/RefData/
+R/SimDist/
+R/SimResults/
 
 
 
