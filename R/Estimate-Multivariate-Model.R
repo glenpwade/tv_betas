@@ -1,5 +1,7 @@
 #  Initialise  ----
 
+# Refactor this file (and associated saved objects) to work with latest Pkg.  Ver 0.9.4.53
+
 rm(list=ls())
 library(MTVGARCH)
 library(knitr)
