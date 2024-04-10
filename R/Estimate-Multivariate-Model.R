@@ -1,6 +1,6 @@
 #  Initialise  ----
 
-# Refactor this file (and associated saved objects) to work with latest Pkg.  Ver 0.9.4.53
+# Refactor this file (and associated saved objects) to work with latest Pkg.  Ver 0.9.4.53 ####
 
 rm(list=ls())
 library(MTVGARCH)
@@ -38,17 +38,27 @@ tvgModels <- ntvgarch(tvg_list,tvg_names)
 
 #tvgModels = readRDS("R/Results/multivar-spec.RDS")
 
+# Refactor: tvgModels now has $e ####
+e <- tvgModels$e
+colnames(e)<- tvg_names
+
+# Refactor: tvgModels$N has changed to tvgModels$N  ####
+
 # all returns into e
-e <- matrix()
-for (n in 1:tvgModels@N){
-  if(n==1) e <- tvgModels[[1]]@e
-  else e = cbind(e,tvgModels[[n]]@e)
+e1 <- matrix()
+for (n in 1:tvgModels$N){
+  if(n==1) e1 <- tvgModels[[1]]@e
+  else e1 = cbind(e1,tvgModels[[n]]@e)
 }
 # Or reading from Returns_USlagged_4B.RDS, col1=date
 if (FALSE){
   e1<-readRDS("R/data/Returns_USlagged_4B.RDS")
 }
-colnames(e)<- tvg_names
+colnames(e1)<- tvg_names
+
+# Refactor - Proof  ####
+identical(e1,e)
+
 
 # Bivariate CCC: ####
 ## Run Tests ----
@@ -56,8 +66,8 @@ Tobs = NROW(e)
 st = seq(0,1,length.out=Tobs)
 cccTestMat1 <- matrix(0,nrow=10,ncol=10)
 cccTestMat2 <- matrix(0,nrow=10,ncol=10)
-for (i in 1:(tvgModels@N-1)){
-  for (j in (i+1):tvgModels@N){
+for (i in 1:(tvgModels$N-1)){
+  for (j in (i+1):tvgModels$N){
     tvgAssetNames <- c(tvg_names[i],tvg_names[j])
     tvgAssetList <- list(tvg_list[[i]],tvg_list[[j]])
     tvgAssets <- ntvgarch(tvgAssetList,tvgAssetNames)
@@ -77,6 +87,15 @@ colnames(cccTestMat1)<-colnames(cccTestMat2)<-rownames(cccTestMat1)<-rownames(cc
 
 #saveRDS(cccTestMat1,"R/Results/cccTestMat1.RDS")
 #saveRDS(cccTestMat2,"R/Results/cccTestMat2.RDS")
+
+cccTestMat1.old = readRDS("R/Results/cccTestMat1.RDS")
+cccTestMat2.old = readRDS("R/Results/cccTestMat2.RDS")
+# Refactor Proof
+identical(cccTestMat1,cccTestMat1.old)
+identical(cccTestMat2,cccTestMat2.old)
+# Drop Refactor proof objects
+rm(e1,cccTestMat1.old,cccTestMat2.old)
+
 
 ## Test Results ----
 
@@ -140,12 +159,19 @@ round(cccTestMat2,4)
 cccTestMat1=readRDS("R/Results/cccTestMat1.RDS")
 cccTestMat2=readRDS("R/Results/cccTestMat2.RDS")
 
+### Extract only Correlated-Pairs Indices ####
+
 # Set the PValues <= 1% as TRUE
 cccTest1_TF = cccTestMat1 <= 0.010
 # Set the Upper Tri to FALSE
 cccTest1_TF[upper.tri(cccTest1_TF)] <- FALSE
 # Get the indexes into a 2 column matrix
 cccTest1_idx <- which(cccTest1_TF, arr.ind = TRUE)
+#
+# cccTest1_idx is a 2-col matrix, holding the indices for all correlated pairs
+# Note: for convenience we left the self-correlation in this matrix and use "if(i != j)" below
+
+### Estimate stcc1 for each pair
 
 stcc1_biv <- list()
 estControl <- list(calcSE = FALSE,verbose = TRUE)
@@ -157,12 +183,14 @@ for (n in 1:NROW(cccTest1_idx)){
     tvgAssetList <- list(tvg_list[[i]],tvg_list[[j]])
     tvgAssets <- ntvgarch(tvgAssetList,tvgAssetNames)
     stccObj <- stcc1(tvgAssets)
-    stccObj<-estimateSTCC1(stccObj,estControl)
+    stccObj$pars["speed"] <- 2.5
+    stccObj$optimcontrol$parscale <- c(1,1,21,3)
+    stccObj <- estimateSTCC1(stccObj,estControl)
     itemName <- paste0(tvgAssetNames[1], " ", tvgAssetNames[2])
     stcc1_biv[[itemName]] <- stccObj
+    cat("\n",NROW(cccTest1_idx)-n, " estimations left to go...\n")
   }
 }
-
 
 
 # Set the PValues <= 1% as TRUE
@@ -182,36 +210,67 @@ estControl <- list(calcSE = FALSE,verbose = TRUE)
       tvgAssetList <- list(tvg_list[[i]],tvg_list[[j]])
       tvgAssets <- ntvgarch(tvgAssetList,tvgAssetNames)
       stccObj <- stcc2(tvgAssets)
+      stccObj$pars["speed1"] <- 2.5
+      stccObj$pars["speed2"] <- 2.5
+      stccObj$optimcontrol$parscale <- c(1,1,1,21,3,21,5)
       stccObj <- estimateSTCC2(stccObj,estControl)
       itemName <- paste0(tvgAssetNames[1], " ", tvgAssetNames[2])
       stcc2_biv[[itemName]] <- stccObj
+      cat("\n",NROW(cccTest2_idx)-n, " estimations left to go...\n")
     }
+  }
+
+# Refactor Proof:
+stcc1_biv.old = readRDS("R/Results/stcc1_biv.RDS")
+stcc2_biv.old = readRDS("R/Results/stcc2_biv.RDS")
+# Refactor Proof
+X = list()
+for(n in 1:length(stcc1_biv)){
+    # Confirm the Pt matrix is very similar:
+    #X[n] <- all.equal(stcc1_biv[[n]]$Estimated$Pt,stcc1_biv.old[[n]]$Estimated$Pt)
+    X[n] <- all.equal(stcc1_biv[[n]]$Estimated$pars[[1]],stcc1_biv.old[[n]]$Estimated$pars[[1]])
+    #X[n] <- all.equal(stcc1_biv[[n]]$Estimated$pars[[2]],stcc1_biv.old[[n]]$Estimated$pars[[2]])
+    #X[n] <- all.equal(stcc2_biv.old[[n]]$Estimated$Pt,stcc2_biv[[n]]$Estimated$Pt)    
+    X[n] <- stcc1_biv[[n]]$Estimated$value - stcc1_biv.old[[n]]$Estimated$value  # Should be +ve
+   
 }
-  
+## Conclusion - Estimated models are a bit different.  Qs. Which is better?
+## Probably need to examine the plots, so save old objects for later
+#
+
+saveRDS(stcc1_biv.old,"R/Results/stcc1_biv.old.RDS")
+saveRDS(stcc2_biv.old,"R/Results/stcc2_biv.old.RDS")
   
 #saveRDS(stcc1_biv,"R/Results/stcc1_biv.RDS")
 #saveRDS(stcc2_biv,"R/Results/stcc2_biv.RDS")
 stcc1_biv <- readRDS("Results/stcc1_biv.RDS")
 stcc2_biv <- readRDS("Results/stcc2_biv.RDS")
-  
+
+# Drop Refactor proof objects
+rm(stcc1_biv.old,stcc2_biv.old)
+
   
 ## Plots ----
 ##> update ----
 # testorder=1
 for (i in 1:length(stcc1_biv)){
   plot(stcc1_biv[[i]]$Estimated$Pt,type='l',main=names(stcc1_biv[i]))  
+# Refactor proof by plots:
+  plot(stcc1_biv.old[[i]]$Estimated$Pt,type='l',main=paste0(names(stcc1_biv.old[i]), " old"))  
 }
 for (i in 1:length(stcc2_biv)){
   plot(stcc2_biv[[i]]$Estimated$Pt,type='l',main=names(stcc2_biv[i]))  
+# Refactor proof by plots:
+  plot(stcc2_biv.old[[i]]$Estimated$Pt,type='l',main=paste0(names(stcc2_biv.old[i]), " old"))  
 }
 
-  
+# Refactor: change tvgModels@Tobs to tvgModels$Tobs ####
 
 # bivariate cor plots
-tmp <- matrix(0,nrow=tvgModels@Tobs,ncol=1)
-x<-100
+tmp <- matrix(0,nrow=tvgModels$Tobs,ncol=1)
+x <- 100
 idx <- c(6,8) # select two: 1:ANZ 2: CBA 3:NAB 4: WBC 5:FourB 6:STW 7:SPY 8:PR 9:CRAU 10:CRUS
-for(t in x:(tvgModels@Tobs-x)){
+for(t in x:(tvgModels$Tobs-x)){
   tmp[t,]<-vecL(cor(e[(t-x+1):(t+x),idx]))
 }
 
@@ -222,6 +281,14 @@ plot(tmp[,1],type='l')
 
 # Multivariate TVCC ####
 
+# View Bi-variate Plots:
+which(names(stcc2_biv) == "ANZ STW")
+indices <- c(5,29)
+for (n in seq_along(indices)){
+    i = indices[n]
+    plot(stcc2_biv[[i]]$Estimated$Pt,type='l',main=names(stcc2_biv[i]))  
+}
+
 ## model 1: ANZ - STW - PR ####
 # 1:ANZ 2: CBA 3:NAB 4: WBC 5:FourB 6:STW 7:SPY 8:PR 9:CRAU 10:CRUS
 tvgAssetNames <- c(tvg_names[1],tvg_names[6],tvg_names[8]) 
@@ -231,13 +298,15 @@ stccObj <- stcc2(tvgAssets)
 stccObj$P1 = unVecL(c(0.6,0,-0.2))
 stccObj$P2 = unVecL(c(0.8,NA,0))
 stccObj$P3 = unVecL(c(0.6,NA,0.3))
-stccObj$pars = c(4,0.2,NA,2,0.67,NA)
+stccObj$pars[1:4] = c(4,0.2,2,0.67)
 estCtrl = list(verbose=TRUE,calcSE=TRUE)
 stccObj$optimcontrol$reltol = 1e-07
+stccObj$optimcontrol$parscale <- c(1,1,1,1,1,1,1,1,1,21,3,21,5)
 
 
 # Estimate using Pkg:
 stccObj <- estimateSTCC2(stccObj,estCtrl)
+#
 plot(stccObj$Estimated$Pt[,1],type='l',main="ANZ-STW")
 plot(stccObj$Estimated$Pt[,2],type='l',main="ANZ-PR")
 plot(stccObj$Estimated$Pt[,3],type='l',main="STW-PR")
@@ -254,9 +323,10 @@ stccObj <- stcc2(tvgAssets)
 stccObj$P1 = unVecL(c(0.6,-0.1,-0.2))
 stccObj$P2 = unVecL(c(0.8,-0.2,0))
 stccObj$P3 = unVecL(c(0.6,NA,0.3))
-stccObj$pars = c(4,0.25,NA,4,0.65,NA)
+stccObj$pars = c(4,0.25,4,0.65)
 estCtrl = list(verbose=TRUE,calcSE=TRUE)
-stccObj$optimcontrol$reltol = 1e-07
+stccObj$optimcontrol$reltol = 1e-05
+stccObj$optimcontrol$parscale <- c(1,1,1,1,1,1,1,1,1,21,3,21,5)
 
 # Estimate using Pkg:
 stccObj <- estimateSTCC2(stccObj,estCtrl)
