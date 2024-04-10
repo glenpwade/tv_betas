@@ -3,7 +3,7 @@
 # Refactor this file (and associated saved objects) to work with latest Pkg.  Ver 0.9.4.53 ####
 
 rm(list=ls())
-library(MTVGARCH)
+library(MTVGARCH)  # ver. 0.9.4.6
 library(knitr)
 
 estCtrl = list(verbose=TRUE,calcSE=TRUE)
@@ -243,8 +243,8 @@ saveRDS(stcc2_biv.old,"R/Results/stcc2_biv.old.RDS")
   
 #saveRDS(stcc1_biv,"R/Results/stcc1_biv.RDS")
 #saveRDS(stcc2_biv,"R/Results/stcc2_biv.RDS")
-stcc1_biv <- readRDS("Results/stcc1_biv.RDS")
-stcc2_biv <- readRDS("Results/stcc2_biv.RDS")
+stcc1_biv <- readRDS("R/Results/stcc1_biv.RDS")
+stcc2_biv <- readRDS("R/Results/stcc2_biv.RDS")
 
 # Drop Refactor proof objects
 rm(stcc1_biv.old,stcc2_biv.old)
@@ -282,8 +282,8 @@ plot(tmp[,1],type='l')
 # Multivariate TVCC ####
 
 # View Bi-variate Plots: ####
-which(names(stcc2_biv) == "CBA STW")
-indices <- c(10,13,30)
+which(names(stcc2_biv) == "STW CRAU")
+indices <- c(23,26,30)
 indices <- c(30)
 for (n in seq_along(indices)){
     i = indices[n]
@@ -504,21 +504,25 @@ plot(stccObj$Estimated$Pt[,3],type='l',main="STW-CRAU")
 #saveRDS(stccObj,"R/Results/CBA_STW_CRAU.RDS")
 
 
-## model 2: NAB - STW - CRAU ####
+## model 2: NAB - STW - CRAU (Done) ####
+# indices <- c(17,30)
 # 1:ANZ 2: CBA 3:NAB 4: WBC 5:FourB 6:STW 7:SPY 8:PR 9:CRAU 10:CRUS
 tvgAssetNames <- c(tvg_names[3],tvg_names[6],tvg_names[9])
 tvgAssetList <- list(tvg_list[[3]],tvg_list[[6]],tvg_list[[9]])
 tvgAssets <- ntvgarch(tvgAssetList,tvgAssetNames)
 stccObj <- stcc2(tvgAssets)
-stccObj$P1 = unVecL(c(0.65,0.1,-0.1))
+stccObj$P1 = unVecL(c(0.6,0.1,-0.1))
 stccObj$P2 = unVecL(c(0.85,NA,0.2))
-stccObj$P3 = unVecL(c(0.6,NA,-0.1))
-stccObj$pars = c(2.5,0.2,NA,2,0.65,NA)
-names(stccObj$pars) <- c("speed1","loc11","loc12","speed2","loc21","loc22")
-stccObj$sel.vec2 = as.numeric(!is.na(vecL(stccObj$P2)))
-stccObj$sel.vec2 = as.numeric(!is.na(vecL(stccObj$P3)))
-estCtrl = list(verbose=TRUE,calcSE=FALSE)
-stccObj<-myestimateSTCC2.R(stccObj,estCtrl)
+stccObj$P3 = unVecL(c(0.7,NA,0.05))
+stccObj$pars[1:4] = c(2.5,0.3,2,0.6)
+stccObj$optimcontrol$reltol = 1e-05
+#stccObj$optimcontrol$parscale <- c(1,1,1,1,1,1,1,1,1,21,3,18,5)
+#stccObj$optimcontrol$ndeps = c(rep(1e-05,9),1e-06,1e-06,1e-06,1e-09)
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+
+# Estimate using Pkg:
+stccObj <- estimateSTCC2(stccObj,estCtrl)
+
 plot(stccObj$Estimated$Pt[,1],type='l',main="NAB-STW")
 plot(stccObj$Estimated$Pt[,2],type='l',main="NAB-CRAU")
 plot(stccObj$Estimated$Pt[,3],type='l',main="STW-CRAU")
@@ -526,21 +530,24 @@ plot(stccObj$Estimated$Pt[,3],type='l',main="STW-CRAU")
 #saveRDS(stccObj,"R/Results/NAB_STW_CRAU.RDS")
 
 
-## model 2: WBC - STW - CRAU ####
+## model 2: WBC - STW - CRAU (Done) ####
 # 1:ANZ 2: CBA 3:NAB 4: WBC 5:FourB 6:STW 7:SPY 8:PR 9:CRAU 10:CRUS
 tvgAssetNames <- c(tvg_names[4],tvg_names[6],tvg_names[9])
 tvgAssetList <- list(tvg_list[[4]],tvg_list[[6]],tvg_list[[9]])
 tvgAssets <- ntvgarch(tvgAssetList,tvgAssetNames)
 stccObj <- stcc2(tvgAssets)
 stccObj$P1 = unVecL(c(0.6,0.15,-0.1))
-stccObj$P2 = unVecL(c(0.85,NA,0.2))
-stccObj$P3 = unVecL(c(0.6,NA,-0.1))
-stccObj$pars = c(2.5,0.2,NA,2,0.65,NA)
-names(stccObj$pars) <- c("speed1","loc11","loc12","speed2","loc21","loc22")
-stccObj$sel.vec2 = as.numeric(!is.na(vecL(stccObj$P2)))
-stccObj$sel.vec2 = as.numeric(!is.na(vecL(stccObj$P3)))
-estCtrl = list(verbose=TRUE,calcSE=FALSE)
-stccObj<-myestimateSTCC2.R(stccObj,estCtrl)
+stccObj$P2 = unVecL(c(0.8,NA,0.2))
+stccObj$P3 = unVecL(c(0.6,NA,-0.05))
+stccObj$pars[1:4] = c(3.5,0.2,2,0.6)
+stccObj$optimcontrol$reltol = 1e-05
+#stccObj$optimcontrol$parscale <- c(1,1,1,1,1,1,1,1,1,21,3,18,5)
+#stccObj$optimcontrol$ndeps = c(rep(1e-05,9),1e-06,1e-06,1e-06,1e-09)
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+
+# Estimate using Pkg:
+stccObj <- estimateSTCC2(stccObj,estCtrl)
+
 plot(stccObj$Estimated$Pt[,1],type='l',main="WBC-STW")
 plot(stccObj$Estimated$Pt[,2],type='l',main="WBC-CRAU")
 plot(stccObj$Estimated$Pt[,3],type='l',main="STW-CRAU")
@@ -548,8 +555,7 @@ plot(stccObj$Estimated$Pt[,3],type='l',main="STW-CRAU")
 #saveRDS(stccObj,"R/Results/WBC_STW_CRAU.RDS")
 
 
-
-## model 2: ANZ~CBA~NAB~WBC - STW - CRAU ####
+## (skip) model 2: ANZ~CBA~NAB~WBC - STW - CRAU ####
 # 1:ANZ 2: CBA 3:NAB 4: WBC 5:FourB 6:STW 7:SPY 8:PR 9:CRAU 10:CRUS
 tvgAssetNames <- c(tvg_names[1],tvg_names[2],tvg_names[3],tvg_names[4],tvg_names[6],tvg_names[9]) 
 tvgAssetList <- list(tvg_list[[1]],tvg_list[[2]],tvg_list[[3]],tvg_list[[4]],tvg_list[[6]],tvg_list[[9]])
@@ -583,32 +589,29 @@ plot(stccObj$Estimated$Pt[,15],type='l',main="STW-CRAU")
 #saveRDS(stccObj,"R/Results/ANZ_CBA_NAB_WBC_STW_CRAU.RDS")
 
 
-## model 2: FourB portfolio - STW - CRAU ####
+## model 2: FourB portfolio - STW - CRAU (Done) ####
 # 1:ANZ 2: CBA 3:NAB 4: WBC 5:FourB 6:STW 7:SPY 8:PR 9:CRAU 10:CRUS
 tvgAssetNames <- c(tvg_names[5],tvg_names[6],tvg_names[9]) 
 tvgAssetList <- list(tvg_list[[5]],tvg_list[[6]],tvg_list[[9]])
 tvgAssets <- ntvgarch(tvgAssetList,tvgAssetNames)
 stccObj <- stcc2(tvgAssets)
-stccObj$P1 = unVecL(c(0.6,0,0))
-stccObj$P2 = unVecL(c(0.85,0,0))
-stccObj$P3 = unVecL(c(0.7,0,0))
-stccObj$pars = c(4,0.35,NA,4,0.75,NA)
-names(stccObj$pars) <- c("speed1","loc11","loc12","speed2","loc21","loc22")
-stccObj$sel.vec2 = as.numeric(!is.na(vecL(stccObj$P2)))
-stccObj$sel.vec2 = as.numeric(!is.na(vecL(stccObj$P3)))
-estCtrl = list(verbose=TRUE,calcSE=FALSE)
-stccObj<-myestimateSTCC2.R(stccObj,estCtrl)
+stccObj$P1 = unVecL(c(0.7,0.3,-0.05))
+stccObj$P2 = unVecL(c(0.9,0.0,0.15))
+stccObj$P3 = unVecL(c(0.75,0.1,0.05))
+stccObj$pars[1:4] = c(4,0.35,4,0.75)
+stccObj$optimcontrol$reltol = 1e-05
+#stccObj$optimcontrol$parscale <- c(1,1,1,1,1,1,1,1,1,21,3,18,5)
+#stccObj$optimcontrol$ndeps = c(rep(1e-05,9),1e-06,1e-06,1e-06,1e-09)
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+
+# Estimate using Pkg:
+stccObj <- estimateSTCC2(stccObj,estCtrl)
+
 plot(stccObj$Estimated$Pt[,1],type='l',main="FourB-STW")
 plot(stccObj$Estimated$Pt[,2],type='l',main="FourB-CRAU")
 plot(stccObj$Estimated$Pt[,3],type='l',main="STW-CRAU")
 
-
 #saveRDS(stccObj,"R/Results/FourB_STW_CRAU.RDS")
-
-
-
-
-
 
 
 ## model 3: ANZ - STW - SPY - CRAU - CRUS ####
@@ -620,12 +623,19 @@ stccObj <- stcc2(tvgAssets)
 stccObj$P1 = unVecL(c(0.6,0.25,0.2,0.35,0.2,0.5))
 stccObj$P2 = unVecL(c(0.8,NA,-0.2,NA,-0.2,0.1))
 stccObj$P3 = unVecL(c(0.6,NA,0,NA,0,-0.2))
-stccObj$pars = c(4,0.25,NA,4,0.75,NA)
-names(stccObj$pars) <- c("speed1","loc11","loc12","speed2","loc21","loc22")
-stccObj$sel.vec2 = as.numeric(!is.na(vecL(stccObj$P2)))
-stccObj$sel.vec2 = as.numeric(!is.na(vecL(stccObj$P3)))
-estCtrl = list(verbose=TRUE,calcSE=FALSE)
-stccObj<-myestimateSTCC2.R(stccObj,estCtrl)
+
+stccObj$P1 = unVecL(c(0.7,0.3,-0.05))
+stccObj$P2 = unVecL(c(0.9,0.0,0.15))
+stccObj$P3 = unVecL(c(0.75,0.1,0.05))
+stccObj$pars[1:4] = c(4,0.35,4,0.75)
+stccObj$optimcontrol$reltol = 1e-05
+#stccObj$optimcontrol$parscale <- c(1,1,1,1,1,1,1,1,1,21,3,18,5)
+#stccObj$optimcontrol$ndeps = c(rep(1e-05,9),1e-06,1e-06,1e-06,1e-09)
+estCtrl = list(verbose=TRUE,calcSE=TRUE)
+
+# Estimate using Pkg:
+stccObj <- estimateSTCC2(stccObj,estCtrl)
+
 plot(stccObj$Estimated$Pt[,1],type='l',main="ANZ-STW")
 plot(stccObj$Estimated$Pt[,2],type='l',main="ANZ-SPY")
 plot(stccObj$Estimated$Pt[,3],type='l',main="ANZ-CRUS")
